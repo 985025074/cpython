@@ -126,6 +126,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Module_type);
     Py_CLEAR(state->Mult_singleton);
     Py_CLEAR(state->Mult_type);
+    Py_CLEAR(state->MyLambda_type);
     Py_CLEAR(state->Name_type);
     Py_CLEAR(state->NamedExpr_type);
     Py_CLEAR(state->Nonlocal_type);
@@ -594,6 +595,10 @@ static const char * const DictComp_fields[]={
 static const char * const GeneratorExp_fields[]={
     "elt",
     "generators",
+};
+static const char * const MyLambda_fields[]={
+    "args",
+    "body",
 };
 static const char * const Await_fields[]={
     "value",
@@ -2929,6 +2934,41 @@ add_ast_annotations(struct ast_state *state)
         return 0;
     }
     Py_DECREF(GeneratorExp_annotations);
+    PyObject *MyLambda_annotations = PyDict_New();
+    if (!MyLambda_annotations) return 0;
+    {
+        PyObject *type = state->arguments_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(MyLambda_annotations, "args", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(MyLambda_annotations);
+            return 0;
+        }
+    }
+    {
+        PyObject *type = state->expr_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(MyLambda_annotations, "body", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(MyLambda_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->MyLambda_type, "_field_types",
+                                  MyLambda_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(MyLambda_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->MyLambda_type, "__annotations__",
+                                  MyLambda_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(MyLambda_annotations);
+        return 0;
+    }
+    Py_DECREF(MyLambda_annotations);
     PyObject *Await_annotations = PyDict_New();
     if (!Await_annotations) return 0;
     {
@@ -6260,6 +6300,7 @@ init_types(void *arg)
         "     | SetComp(expr elt, comprehension* generators)\n"
         "     | DictComp(expr key, expr value, comprehension* generators)\n"
         "     | GeneratorExp(expr elt, comprehension* generators)\n"
+        "     | MyLambda(arguments args, expr body)\n"
         "     | Await(expr value)\n"
         "     | Yield(expr? value)\n"
         "     | YieldFrom(expr value)\n"
@@ -6331,6 +6372,10 @@ init_types(void *arg)
                                          2,
         "GeneratorExp(expr elt, comprehension* generators)");
     if (!state->GeneratorExp_type) return -1;
+    state->MyLambda_type = make_type(state, "MyLambda", state->expr_type,
+                                     MyLambda_fields, 2,
+        "MyLambda(arguments args, expr body)");
+    if (!state->MyLambda_type) return -1;
     state->Await_type = make_type(state, "Await", state->expr_type,
                                   Await_fields, 1,
         "Await(expr value)");
@@ -7895,6 +7940,34 @@ _PyAST_GeneratorExp(expr_ty elt, asdl_comprehension_seq * generators, int
     p->kind = GeneratorExp_kind;
     p->v.GeneratorExp.elt = elt;
     p->v.GeneratorExp.generators = generators;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+expr_ty
+_PyAST_MyLambda(arguments_ty args, expr_ty body, int lineno, int col_offset,
+                int end_lineno, int end_col_offset, PyArena *arena)
+{
+    expr_ty p;
+    if (!args) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'args' is required for MyLambda");
+        return NULL;
+    }
+    if (!body) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'body' is required for MyLambda");
+        return NULL;
+    }
+    p = (expr_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = MyLambda_kind;
+    p->v.MyLambda.args = args;
+    p->v.MyLambda.body = body;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -9573,6 +9646,21 @@ ast2obj_expr(struct ast_state *state, void* _o)
                              ast2obj_comprehension);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->generators, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case MyLambda_kind:
+        tp = (PyTypeObject *)state->MyLambda_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_arguments(state, o->v.MyLambda.args);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->args, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr(state, o->v.MyLambda.body);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->body, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -14420,6 +14508,54 @@ obj2ast_expr(struct ast_state *state, PyObject* obj, expr_ty* out, PyArena*
         if (*out == NULL) goto failed;
         return 0;
     }
+    tp = state->MyLambda_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        arguments_ty args;
+        expr_ty body;
+
+        if (PyObject_GetOptionalAttr(obj, state->args, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"args\" missing from MyLambda");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'MyLambda' node")) {
+                goto failed;
+            }
+            res = obj2ast_arguments(state, tmp, &args, arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        if (PyObject_GetOptionalAttr(obj, state->body, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"body\" missing from MyLambda");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'MyLambda' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr(state, tmp, &body, arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_MyLambda(args, body, lineno, col_offset, end_lineno,
+                               end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
     tp = state->Await_type;
     isinstance = PyObject_IsInstance(obj, tp);
     if (isinstance == -1) {
@@ -17773,6 +17909,9 @@ astmodule_exec(PyObject *m)
     }
     if (PyModule_AddObjectRef(m, "GeneratorExp", state->GeneratorExp_type) < 0)
         {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "MyLambda", state->MyLambda_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Await", state->Await_type) < 0) {

@@ -693,6 +693,7 @@ expression[expr_ty] (memo):
     | a=disjunction 'if' b=disjunction 'else' c=expression { _PyAST_IfExp(b, a, c, EXTRA) }
     | disjunction
     | lambdef
+    | myLambda
 
 yield_expr[expr_ty]:
     | 'yield' 'from' a=expression { _PyAST_YieldFrom(a, EXTRA) }
@@ -872,8 +873,12 @@ group[expr_ty]:
 
 # Lambda functions
 # ----------------
+myLambda[expr_ty]:
+    | '(' a=[params] ')''=>''{' b=expression'}' {
+        _PyAST_MyLambda((a) ? a : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, EXTRA) }
 
 lambdef[expr_ty]:
+    | '(' a=[params] ')''=>''{' b=expression'}' 
     | 'lambda' a=[lambda_params] ':' b=expression {
         _PyAST_Lambda((a) ? a : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, EXTRA) }
 
@@ -1179,6 +1184,7 @@ expression_without_invalid[expr_ty]:
     | a=disjunction 'if' b=disjunction 'else' c=expression { _PyAST_IfExp(b, a, c, EXTRA) }
     | disjunction
     | lambdef
+    | myLambda
 invalid_legacy_expression:
     | a=NAME !'(' b=star_expressions {
         _PyPegen_check_legacy_stmt(p, a) ? RAISE_SYNTAX_ERROR_KNOWN_RANGE(a, b,

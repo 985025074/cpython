@@ -275,6 +275,10 @@ validate_expr(expr_ty exp, expr_context_ty ctx)
         ret = validate_arguments(exp->v.Lambda.args) &&
             validate_expr(exp->v.Lambda.body, Load);
         break;
+    case MyLambda_kind:
+        ret = validate_arguments(exp->v.MyLambda.args) &&
+            validate_expr(exp->v.MyLambda.body, Load);
+        break;
     case IfExp_kind:
         ret = validate_expr(exp->v.IfExp.test, Load) &&
             validate_expr(exp->v.IfExp.body, Load) &&

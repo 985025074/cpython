@@ -1999,7 +1999,7 @@ codegen_lambda(compiler *c, expr_ty e)
     PyCodeObject *co;
     Py_ssize_t funcflags;
     arguments_ty args = e->v.Lambda.args;
-    assert(e->kind == Lambda_kind);
+    assert(e->kind == Lambda_kind || e->kind == MyLambda_kind);
 
     location loc = LOC(e);
     funcflags = codegen_default_arguments(c, loc, args);
@@ -3605,6 +3605,7 @@ infer_type(expr_ty e)
     case GeneratorExp_kind:
         return &PyGen_Type;
     case Lambda_kind:
+    case MyLambda_kind:
         return &PyFunction_Type;
     case JoinedStr_kind:
     case FormattedValue_kind:
@@ -3659,6 +3660,7 @@ check_subscripter(compiler *c, expr_ty e)
     case Set_kind:
     case SetComp_kind:
     case GeneratorExp_kind:
+    case MyLambda_kind:
     case Lambda_kind: {
         location loc = LOC(e);
         return _PyCompile_Warn(c, loc, "'%.200s' object is not subscriptable; "
@@ -5128,6 +5130,7 @@ codegen_visit_expr(compiler *c, expr_ty e)
         }
         break;
     case Lambda_kind:
+    case MyLambda_kind:
         return codegen_lambda(c, e);
     case IfExp_kind:
         return codegen_ifexp(c, e);

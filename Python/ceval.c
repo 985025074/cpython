@@ -1010,16 +1010,19 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
     int oparg;         /* Current opcode argument, if any */
     assert(tstate->current_frame == NULL || tstate->current_frame->stackpointer != NULL);
 #endif
+    // 差不多就是FRAM
     _PyInterpreterFrame entry_frame;
-
+    // 检查递归调用
     if (_Py_EnterRecursiveCallTstate(tstate, "")) {
         assert(frame->owner != FRAME_OWNED_BY_INTERPRETER);
         _PyEval_FrameClearAndPop(tstate, frame);
         return NULL;
     }
 
+    //一些重要变量
     /* Local "register" variables.
-     * These are cached values from the frame and code object.  */
+
+    * These are cached values from the frame and code object.  */
     _Py_CODEUNIT *next_instr;
     _PyStackRef *stack_pointer;
     entry_frame.localsplus[0] = PyStackRef_NULL;
@@ -1035,6 +1038,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
 #endif
     entry_frame.f_executable = PyStackRef_None;
     entry_frame.instr_ptr = (_Py_CODEUNIT *)_Py_INTERPRETER_TRAMPOLINE_INSTRUCTIONS + 1;
+    // 运行栈是localplus 上的
     entry_frame.stackpointer = entry_frame.localsplus;
     entry_frame.owner = FRAME_OWNED_BY_INTERPRETER;
     entry_frame.visited = 0;
@@ -1043,6 +1047,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
     entry_frame.lltrace = 0;
 #endif
     /* Push frame */
+    // 串联，形成链表结构
     entry_frame.previous = tstate->current_frame;
     frame->previous = &entry_frame;
     tstate->current_frame = frame;
@@ -1052,6 +1057,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
         if (_Py_EnterRecursivePy(tstate)) {
             goto early_exit;
         }
+        // 有关GIL，后面再研究
 #ifdef Py_GIL_DISABLED
         /* Load thread-local bytecode */
         if (frame->tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index) {
@@ -1065,7 +1071,8 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
             frame->instr_ptr = bytecode + off;
         }
 #endif
-        /* Because this avoids the RESUME, we need to update instrumentation */
+        //暂不清楚作用
+/* Because this avoids the RESUME, we need to update instrumentation */
         _Py_Instrument(_PyFrame_GetCode(frame), tstate->interp);
         next_instr = frame->instr_ptr;
         monitor_throw(tstate, frame, next_instr);

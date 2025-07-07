@@ -71,6 +71,7 @@ _PyRun_AnyFileObject(FILE *fp, PyObject *filename, int closeit,
     }
 
     int res;
+    // 终端运行
     if (_Py_FdIsInteractive(fp, filename)) {
         res = _PyRun_InteractiveLoopObject(fp, filename, flags);
         if (closeit) {
@@ -463,10 +464,11 @@ _PyRun_SimpleFileObject(FILE *fp, PyObject *filename, int closeit,
                         PyCompilerFlags *flags)
 {
     int ret = -1;
-
+//  增加一个Main module 到线程
     PyObject *main_module = PyImport_AddModuleRef("__main__");
     if (main_module == NULL)
         return -1;
+    // 获得module 里的名称空间？
     PyObject *dict = PyModule_GetDict(main_module);  // borrowed ref
 
     int set_file_name = 0;
@@ -474,6 +476,7 @@ _PyRun_SimpleFileObject(FILE *fp, PyObject *filename, int closeit,
     if (has_file < 0) {
         goto done;
     }
+    // 给名称空间设置一些东西
     if (!has_file) {
         if (PyDict_SetItemString(dict, "__file__", filename) < 0) {
             goto done;
@@ -483,12 +486,12 @@ _PyRun_SimpleFileObject(FILE *fp, PyObject *filename, int closeit,
         }
         set_file_name = 1;
     }
-
+    // 查看有没有pyc
     int pyc = maybe_pyc_file(fp, filename, closeit);
     if (pyc < 0) {
         goto done;
     }
-
+    // pyc 我们不看
     PyObject *v;
     if (pyc) {
         FILE *pyc_fp;
@@ -518,6 +521,7 @@ _PyRun_SimpleFileObject(FILE *fp, PyObject *filename, int closeit,
             ret = -1;
             goto done;
         }
+
         v = pyrun_file(fp, filename, Py_file_input, dict, dict,
                        closeit, flags);
     }
@@ -1275,11 +1279,13 @@ static PyObject *
 pyrun_file(FILE *fp, PyObject *filename, int start, PyObject *globals,
            PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
+    // 内存分配涉及，我们暂时不看
     PyArena *arena = _PyArena_New();
     if (arena == NULL) {
         return NULL;
     }
 
+    // module AST 节点
     mod_ty mod;
     mod = _PyParser_ASTFromFile(fp, filename, NULL, start, NULL, NULL,
                                 flags, NULL, arena);
@@ -1289,6 +1295,7 @@ pyrun_file(FILE *fp, PyObject *filename, int start, PyObject *globals,
     }
 
     PyObject *ret;
+    // 运行module 了
     if (mod != NULL) {
         ret = run_mod(mod, filename, globals, locals, flags, arena, NULL, 0);
     }
@@ -1346,14 +1353,17 @@ static PyObject *
 run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, PyObject *locals)
 {
     /* Set globals['__builtins__'] if it doesn't exist */
+    // a安全必要写减产
     if (!globals || !PyDict_Check(globals)) {
         PyErr_SetString(PyExc_SystemError, "globals must be a real dict");
         return NULL;
     }
+    // 检查
     int has_builtins = PyDict_ContainsString(globals, "__builtins__");
     if (has_builtins < 0) {
         return NULL;
     }
+    // 发现buitins 是主线程共享的
     if (!has_builtins) {
         if (PyDict_SetItemString(globals, "__builtins__",
                                  tstate->interp->builtins) < 0)
@@ -1372,6 +1382,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
 {
     PyThreadState *tstate = _PyThreadState_GET();
     PyObject* interactive_filename = filename;
+    // 终端运行涉及
     if (interactive_src) {
         PyInterpreterState *interp = tstate->interp;
         if (generate_new_source) {
@@ -1384,7 +1395,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
             return NULL;
         }
     }
-
+    // 编译一个 code object
     PyCodeObject *co = _PyAST_Compile(mod, interactive_filename, flags, -1, arena);
     if (co == NULL) {
         if (interactive_src) {
@@ -1392,7 +1403,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
         }
         return NULL;
     }
-
+    // 不需要看，终端运行涉及
     if (interactive_src) {
         PyObject *print_tb_func = PyImport_ImportModuleAttrString(
             "linecache",
@@ -1432,7 +1443,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
         Py_DECREF(co);
         return NULL;
     }
-
+    // 运行 code obejct
     PyObject *v = run_eval_code_obj(tstate, co, globals, locals);
     Py_DECREF(co);
     return v;

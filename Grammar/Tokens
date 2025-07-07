@@ -54,6 +54,7 @@ RARROW                  '->'
 ELLIPSIS                '...'
 COLONEQUAL              ':='
 EXCLAMATION             '!'
+RIGHTARROW              '=>'
 
 OP
 TYPE_IGNORE

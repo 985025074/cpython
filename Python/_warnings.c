@@ -1022,7 +1022,7 @@ next_external_frame(PyFrameObject *frame, PyTupleObject *skip_file_prefixes)
 /* skip_file_prefixes is either NULL or a tuple of strs. */
 /* Returns 0 on error (no new refs), 1 on success */
 static int
-setup_context(Py_ssize_t stack_level,
+    setup_context(Py_ssize_t stack_level,
               PyTupleObject *skip_file_prefixes,
               PyObject **filename, int *lineno,
               PyObject **module, PyObject **registry)
@@ -1064,9 +1064,10 @@ setup_context(Py_ssize_t stack_level,
             f = next_external_frame(f, skip_file_prefixes);
         }
     }
-
+    // 如果在编译阶段出错，那么filename就是sys + globals 里的name 也是sys 
     if (f == NULL) {
         globals = interp->sysdict;
+        // we should set it as the right filename
         *filename = PyUnicode_FromString("<sys>");
         *lineno = 0;
     }
@@ -1100,9 +1101,12 @@ setup_context(Py_ssize_t stack_level,
     /* Setup module. */
     rc = PyDict_GetItemRef(globals, &_Py_ID(__name__), module);
     if (rc < 0) {
-        goto handle_error;
+        goto handle_error;  
     }
+    
     if (rc > 0) {
+        // Fname is find, so module is __name__
+        // module is sys 如果是编译阶段错误的找到话
         if (Py_IsNone(*module) || PyUnicode_Check(*module)) {
             return 1;
         }
@@ -1166,7 +1170,7 @@ do_warn(PyObject *message, PyObject *category, Py_ssize_t stack_level,
     if (!setup_context(stack_level, skip_file_prefixes,
                        &filename, &lineno, &module, &registry))
         return NULL;
-
+    // module 是 sys 
     warnings_lock(tstate->interp);
     res = warn_explicit(tstate, category, message, filename, lineno, module, registry,
                         NULL, source);
@@ -1492,7 +1496,9 @@ _PyErr_WarnExplicitObjectWithContext(PyObject *category, PyObject *message,
                        &module, &registry)) {
         return -1;
     }
-
+    
+    // sys 已经种下
+    // 下面这个函数执行完毕，异常将被抛出
     int rc = PyErr_WarnExplicitObject(category, message, filename, lineno,
                                       module, registry);
     Py_DECREF(unused_filename);

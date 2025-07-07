@@ -358,6 +358,7 @@ static int
 pymain_run_file_obj(PyObject *program_name, PyObject *filename,
                     int skip_source_first_line)
 {
+    // 审计，以后了解下，是什么玩意
     if (PySys_Audit("cpython.run_file", "O", filename) < 0) {
         return pymain_exit_err_print();
     }
@@ -371,7 +372,7 @@ pymain_run_file_obj(PyObject *program_name, PyObject *filename,
                            program_name, filename, errno, strerror(errno));
         return 2;
     }
-
+    // shebang ?
     if (skip_source_first_line) {
         int ch;
         /* Push back first newline so line numbers remain the same */
@@ -390,7 +391,7 @@ pymain_run_file_obj(PyObject *program_name, PyObject *filename,
         fclose(fp);
         return 1;
     }
-
+    //安全的处理一下pending calls
     // Call pending calls like signal handlers (SIGINT)
     if (Py_MakePendingCalls() == -1) {
         fclose(fp);
@@ -406,11 +407,14 @@ pymain_run_file_obj(PyObject *program_name, PyObject *filename,
 static int
 pymain_run_file(const PyConfig *config)
 {
+    //  转 File Name 为Python 对象
     PyObject *filename = PyUnicode_FromWideChar(config->run_filename, -1);
     if (filename == NULL) {
         PyErr_Print();
         return -1;
     }
+    // 转 Program Name 为Python 对象
+    // Programname是python 名字？
     PyObject *program_name = PyUnicode_FromWideChar(config->program_name, -1);
     if (program_name == NULL) {
         Py_DECREF(filename);
@@ -604,6 +608,9 @@ pymain_repl(PyConfig *config, int *exitcode)
 static void
 pymain_run_python(int *exitcode)
 {
+
+    // main_import_path是 import 首先查找的目录
+    // 也就是sys.path[0]
     PyObject *main_importer_path = NULL;
     PyInterpreterState *interp = _PyInterpreterState_GET();
     /* pymain_run_stdin() modify the config */
@@ -617,9 +624,12 @@ pymain_run_python(int *exitcode)
     // XXX Calculate config->sys_path_0 in getpath.py.
     // The tricky part is that we can't check the path importers yet
     // at that point.
+    // sys path 是 NULL ？还没设置的意思
     assert(config->sys_path_0 == NULL);
 
     if (config->run_filename != NULL) {
+        // run_filename大概就是我们的文件名
+        // 如果是一个package  会设置一个特殊变量，并且加入 path 
         /* If filename is a package (ex: directory or ZIP file) which contains
            __main__.py, main_importer_path is set to filename and will be
            prepended to sys.path.
@@ -633,11 +643,15 @@ pymain_run_python(int *exitcode)
 
     // import readline and rlcompleter before script dir is added to sys.path
     pymain_import_readline(config);
-
+    // readlikne 包 提供 一些交互功能
     PyObject *path0 = NULL;
     if (main_importer_path != NULL) {
+        // Py_NewRef
+        // 是为了增加引用计数
         path0 = Py_NewRef(main_importer_path);
     }
+    // 如果不是包的情况下，根据args 计算
+    // config 里带一个设置 禁止
     else if (!config->safe_path) {
         int res = _PyPathConfig_ComputeSysPath0(&config->argv, &path0);
         if (res < 0) {
@@ -649,6 +663,7 @@ pymain_run_python(int *exitcode)
     }
     // XXX Apply config->sys_path_0 in init_interp_main().  We have
     // to be sure to get readline/rlcompleter imported at the correct time.
+    // syspath0加到interpreter上
     if (path0 != NULL) {
         wchar_t *wstr = PyUnicode_AsWideCharString(path0, NULL);
         if (wstr == NULL) {

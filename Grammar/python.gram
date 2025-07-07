@@ -688,6 +688,7 @@ expressions[expr_ty]:
     | expression
 
 expression[expr_ty] (memo):
+    | ArrowLambdaDef
     | invalid_expression
     | invalid_legacy_expression
     | a=disjunction 'if' b=disjunction 'else' c=expression { _PyAST_IfExp(b, a, c, EXTRA) }
@@ -872,7 +873,13 @@ group[expr_ty]:
 
 # Lambda functions
 # ----------------
-
+arrow_block[asdl_stmt_seq*]:
+    | NEWLINE INDENT  a=statements NEWLINE {a}
+    | NEWLINE INDENT  a=statements {a}
+    | a=statements { a }
+ArrowLambdaDef[expr_ty]:
+    | '(' a=[params] ')' '=>' '{' b=[arrow_block] '}' {
+        _PyAST_ArrowLambda((a) ? a : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, EXTRA) }
 lambdef[expr_ty]:
     | 'lambda' a=[lambda_params] ':' b=expression {
         _PyAST_Lambda((a) ? a : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, EXTRA) }

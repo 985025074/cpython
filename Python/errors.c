@@ -1914,16 +1914,19 @@ void
 _PyErr_RaiseSyntaxError(PyObject *msg, PyObject *filename, int lineno, int col_offset,
                         int end_lineno, int end_col_offset)
 {
+    //出错的 代码文件
     PyObject *text = PyErr_ProgramTextObject(filename, lineno);
     if (text == NULL) {
         text = Py_NewRef(Py_None);
     }
+    // 错误的参数
     PyObject *args = Py_BuildValue("O(OiiOii)", msg, filename,
                                    lineno, col_offset, text,
                                    end_lineno, end_col_offset);
     if (args == NULL) {
         goto exit;
     }
+    // 设置异常，设置到当前线程状态
     PyErr_SetObject(PyExc_SyntaxError, args);
  exit:
     Py_DECREF(text);

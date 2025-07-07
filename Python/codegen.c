@@ -1808,14 +1808,17 @@ static PyTypeObject * infer_type(expr_ty e);
 static int
 codegen_check_compare(compiler *c, expr_ty e)
 {
+    // the passed e is a Compare node
     Py_ssize_t i, n;
     bool left = check_is_arg(e->v.Compare.left);
     expr_ty left_expr = e->v.Compare.left;
+    // 可能有多个 比较运算符，compare 包括 a<b<c这种串行的狮子
     n = asdl_seq_LEN(e->v.Compare.ops);
     for (i = 0; i < n; i++) {
         cmpop_ty op = (cmpop_ty)asdl_seq_GET(e->v.Compare.ops, i);
         expr_ty right_expr = (expr_ty)asdl_seq_GET(e->v.Compare.comparators, i);
         bool right = check_is_arg(right_expr);
+        // 如果监测到 is 或 is not 的比较运算符，并且op 是 is 或 is not
         if (op == Is || op == IsNot) {
             if (!right || !left) {
                 const char *msg = (op == Is)
@@ -5129,6 +5132,8 @@ codegen_visit_expr(compiler *c, expr_ty e)
         break;
     case Lambda_kind:
         return codegen_lambda(c, e);
+    case ArrowLambda_kind:
+        return codegen_arrow_lambda(c, e);
     case IfExp_kind:
         return codegen_ifexp(c, e);
     case Dict_kind:

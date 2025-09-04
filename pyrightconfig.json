@@ -1,0 +1,46 @@
+{
+	"include": [
+		"Lib/**/*",
+		"Include/**/*",
+		"Modules/**/*",
+		"Python/**/*",
+		"Tools/**/*.py"
+	],
+	"exclude": [
+		"build/**/*",
+		"Doc/**/*",
+		"Misc/**/*",
+		"PC/**/*",
+		"Scripts/**/*",
+		"test/**/*",
+		"venv/**/*",
+		"*.egg-info/**/*"
+	],
+	"pythonPlatform": "linux",
+	"typeCheckingMode": "basic",
+	"extraPaths": [
+		"Lib",
+		"Include",
+		"Modules",
+		"Python"
+	],
+	"analysis": {
+		"autoSearchPaths": true,
+		"useLibraryCodeForTypes": true,
+		"diagnosticMode": "workspace",
+		"includePackageData": true,
+		"strictParameterNoneValue": false,
+		"allowUnusedVariables": false,
+		"allowUnreachableCode": false
+	},
+	"ignore": [
+		{
+			"code": "reportMissingImports",
+			"path": "Lib/**/*"
+		},
+		{
+			"code": "reportUndefinedVariable",
+			"path": "Modules/**/*"
+		}
+	]
+}

@@ -1,0 +1,2 @@
+CompileFlags:
+ CompilationDatabase: . # 指向存放 compile_commands.json 的目录   CompilationDatabase: "cmake"

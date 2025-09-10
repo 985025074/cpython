@@ -1,2 +1,11 @@
 CompileFlags:
  CompilationDatabase: . # 指向存放 compile_commands.json 的目录   CompilationDatabase: "cmake"
+ # Add:
+ #    - -I./Include  # 包含 CPython 项目的 Include 目录
+ #    - -I./Include/cpython  # 包含 CPython 的 cpython 头文件目录
+ #    - -I./Python  # Python 源代码所在目录
+ #    - -I./Modules  # Modules 目录，包含很多 CPython 核心模块的实现
+ #    - -I./Objects  # Objects 目录，包含 CPython 的对象实现
+ #    - -I./Parser  # Parser 目录，包含 CPython 解析器的实现
+ #    - -I./Py  # 包含 CPython Python API 的头文件
+ #    - -I./Preconfig  # 包含 C 预配置文件的头文件 - -I /home/shiyicong/cpython/Include/cpython/

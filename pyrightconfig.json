@@ -17,7 +17,6 @@
 		"*.egg-info/**/*"
 	],
 	"pythonPlatform": "linux",
-	"typeCheckingMode": "basic",
 	"extraPaths": [
 		"Lib",
 		"Include",
